@@ -65,7 +65,7 @@ class Astre(ABC):
         self.actif = en_booleen(actif)
         #Les valeurs numériques peuvent venir du CSV ou d'un formulaire : on vérifie leur conversion
         try:
-            self.masse = float(masse
+            self.masse = float(masse)
             self.taille = float(taille)
             self.rayon = float(rayon)
         except (TypeError, ValueError):
@@ -91,7 +91,17 @@ class Astre(ABC):
         else:
             theta = np.full(len(temps), phase) #ce qui signifie que l'astre est immobile: l'angle reste la phase
         centre = np.zeros((len(temps), 2)) if self.parent is None else self.parent.positions(temps)
+        return centre + self.distance * np.column_stack((np.cos(theta), np.sin(theta)))
+    
+    def distance_max(self) -> float:
+        #retourne la plus grande distance entre l'astre et son centre
+        return self.distance
 
+    def points_orbite(self, t: float, nb_points: int = 120) -> np.ndarray:
+        #retourne les points de l'orbitre pour la dessiner avec ax.plot
+        angles = np.linspace(0, 2 * np.pi, nb_points)
+        centre = np.zeros(2) if self.parent is None else self.parent.position(t)
+        return centre + self.distance * np.column_stack((np.cos(angles), np.sin(angles)))
 
 
 
