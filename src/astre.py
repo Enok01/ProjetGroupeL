@@ -9,6 +9,7 @@ Documentation officielle :
 from abc import ABC, abstractmethod
 
 import numpy as np
+import math
 
 #Constante gravitationnelle convertie dans les unités du programme : UA³ / (masse terrestre · jour²) ≈ 8,888e-10
 G_SI = 6.67430e-11          # m³ / (kg · s²)
@@ -64,13 +65,36 @@ class Astre(ABC):
         self.actif = en_booleen(actif)
         #Les valeurs numériques peuvent venir du CSV ou d'un formulaire : on vérifie leur conversion
         try:
-            self.masse = float(masse)
+            self.masse = float(masse
             self.taille = float(taille)
             self.rayon = float(rayon)
         except (TypeError, ValueError):
             raise ValueError(f"Astre « {nom} » : masse, taille et rayon doivent être des nombres") from None
         if self.masse < 0 or self.rayon < 0 or self.taille <= 0:
             raise ValueError(f"Astre « {nom} » : masse et rayon doivent être positifs, taille strictement positive")
+
+    def _tableau_temps(self, temps) -> np.ndarray:
+        # convertit une ligne de temps en tableau numpy
+        try:
+            # ne copie pas si le tableau recu est déjà un array
+            return np.asarray(temps, dtype=float).reshape(-1)
+        except (TypeError, ValueError):
+            #from None permet d'afficher la nouvelle erreur et supprimer l'ancienne erreur
+            raise ValueError (f"AstreFixe {self.nom} : les temps doivent etre des nombres de jours") from None
+
+    def positions(self, temps) -> np.ndarray:
+        """retourne les positions (x, y) a plusieurs instants d'un coup sans boucle"""
+        temps = self._tableau_temps(temps)
+        phase = np.radians(self.phase)
+        if self.periode > 0:
+            theta = 2*np.pi*temps / self.periode + phase
+        else:
+            theta = np.full(len(temps), phase) #ce qui signifie que l'astre est immobile: l'angle reste la phase
+        centre = np.zeros((len(temps), 2)) if self.parent is None else self.parent.positions(temps)
+
+
+
+
 
     @abstractmethod
     def position(self, t: float) -> np.ndarray:
