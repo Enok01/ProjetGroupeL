@@ -7,6 +7,7 @@ Documentation officielle :
     pandas Series.get (lecture d'une ligne du CSV) : https://pandas.pydata.org/docs/reference/api/pandas.Series.get.html
 """
 from abc import ABC, abstractmethod
+from xml.dom import NoModificationAllowedErr
 
 import numpy as np
 import math
@@ -202,19 +203,14 @@ class AstreFixe(Astre):
             try:
                 valeur = float(valeur)
             except (TypeError, ValueError):
-                raise ValueError(f"Astre « {nom} », colonne « {cle} » : « {valeur} » n'est pas un nombre") from None
-            #np.isnan : vrai si la valeur est NaN, ce que pandas met dans une case vide du CSV
-            #https://numpy.org/doc/stable/reference/generated/numpy.isnan.html
+                raise ValueError(f"Astre « {nom} », colonne « {cle} » : « {valeur} » n'est pas un nombre") from None 
             return defaut if np.isnan(valeur) else valeur
+    
+    valeurs = dict(
+            nom = nom
 
-        return cls(
-            nom=nom,
-            masse=nombre("masse"),
-            couleur=str(ligne.get("couleur") or "#FFFFFF").strip(),
-            taille=nombre("taille", 5.0),
-            rayon=nombre("rayon"),
-            actif=en_booleen(ligne.get("actif", True)),
-            distance=nombre("distance"),
-            periode=nombre("periode"),
-            phase=nombre("phase"),
-        )
+
+
+
+
+    )
