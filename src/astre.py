@@ -206,11 +206,43 @@ class AstreFixe(Astre):
                 raise ValueError(f"Astre « {nom} », colonne « {cle} » : « {valeur} » n'est pas un nombre") from None 
             return defaut if np.isnan(valeur) else valeur
     
-    valeurs = dict(
-            nom = nom
+        valeurs = dict(
+            nom=nom,
+            masse=nombre("masse"),
+            couleur=str(ligne.get("couleur") or "#FFFFFF").strip(),
+            taille=nombre("taille", 5.0),
+            rayon=nombre("rayon"),
+            actif=en_booleen(ligne.get("actif", True)),
+            distance=nombre("distance"),
+            periode=nombre("periode"),
+            phase=nombre("phase"),
+        )
+        # Colonnes facultatives : une excentricité non nulle donne une orbite elliptique.
+        # != 0 (et pas > 0) : une excentricité négative arrive dans AstreElliptique, qui la refuse avec un message clair.
+        excentricite = nombre("excentricite")
+        if excentricite != 0:
+            return AstreElliptique(**valeurs, excentricite=excentricite, perihelie=nombre("perihelie"))
+        return cls(**valeurs)
 
 
+class AstreElliptique(AstreFixe):
 
+    ITERATIONS_KEPLER = 15 # cette valeur représente un nombre fixe d'itérations de Newton
 
+    def __init__(self, nom: str, masse: float, couleur: str, taille: float, rayon: float, actif: bool = True, distance: float = 0.0,
+                 periode: float = 0.0, phase: float = 0.0, parent = None, excentricite: float = 0.0, perihelie: float = 0.0):
+                 
+                 super().__init__(nom, masse, couleur, taille, rayon, actif, distance, periode, phase, parent)
+                 
+                 try:
+                    self.excentricite = float(excentricite)
+                    self.perihelie = float(perihelie)
+                except (TypeError, ValueError):
+                    raise ValueError(f"AstreElliptique « {nom} » : excentricité et périhélie doivent être des nombres") from None
 
-    )
+                    # not (0 <= e < 1) refuse NaN, car toute comparaison avec NaN est fausse
+                    if not 0 <= self.excentricite < 1:
+                        raise ValueError(f"AstreElliptique {nom} : l'excentricité doit être entre 0 (inclus) et 1 (exclu), "
+                        f"recu {self.excentricite}")
+
+                        
