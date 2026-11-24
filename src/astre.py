@@ -245,4 +245,28 @@ class AstreElliptique(AstreFixe):
                         raise ValueError(f"AstreElliptique {nom} : l'excentricité doit être entre 0 (inclus) et 1 (exclu), "
                         f"recu {self.excentricite}")
 
+    def _anomalie_excentrique(self, _anomalie_moyenne: np.ndarray) -> np.ndarray:
+        """
+        Résout l'équation de Kepler E - e·sin(E) = M par la méthode de Newton.
+
+        Il n'existe pas de formule directe pour E : on part d'une estimation et on la corrige
+        ITERATIONS_KEPLER fois. Le dénominateur 1 - e·cos(E) vaut au moins 1 - e > 0 : jamais de division par zéro.
+
+        :param anomalie_moyenne: Tableau des M, en radians
+        :return: Tableau des E, en radians
+        """
+
+        e = self.excentricite
+        # Depart E = M ou E = pi
+        for _ in range(self.ITERATIONS_KEPLER):
+            E -= (E - e * np.sin(E) - anomalie_moyenne) / (1 - e * np.cos(E))
+        return E
+
+    def _dans_le_plan(self, E: np.ndarray) -> np.ndarray:
+        """
+        Position par rapport au foyer pour des anomalies excentriques E, tournée de l'angle du périhélie.
+
+        :param E: Tableau des anomalies excentriques, en radians
+        :return: Tableau numpy de forme (n, 2)
+        """
                         
