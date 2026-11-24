@@ -262,11 +262,56 @@ class AstreElliptique(AstreFixe):
             E -= (E - e * np.sin(E) - anomalie_moyenne) / (1 - e * np.cos(E))
         return E
 
+    # https://fr.wikipedia.org/wiki/%C3%89quation_de_Kepler
     def _dans_le_plan(self, E: np.ndarray) -> np.ndarray:
         """
         Position par rapport au foyer pour des anomalies excentriques E, tournée de l'angle du périhélie.
 
         :param E: Tableau des anomalies excentriques, en radians
         :return: Tableau numpy de forme (n, 2)
+
         """
-                        
+        a, e = self.distance, sefl.excentricite
+        x = a * (np.cos(E) - e)  # On decale le foyer par rapport au centre de l'ellipse
+        y = a * np.sqrt(1 - e * e) * np.sin(E)   # b = a·√(1 - e²) : le demi-petit axe
+        w = np.radians(self.perihelie)
+        # Rotation d'angle w : (x cos w - y sin w, x sin w + y cos w)
+        return np.column_stack((x * np.cos(w) - y * np.sin(w), x * np.sin(w) + y * np.cos(w)))
+
+    def positions(self, temps) -> np.ndarray:
+        """Positions à plusieurs instants ; même rôle que AstreFixe.positions. Complexité O(n)."""
+        temps = self._tableau_temps(temps)
+        if self.periode > 0:
+            anomalie_moyenne = np.radians(self.phase) + 2 * np.pi * temps / self.periode
+        else:
+            anomalie_moyenne = np.full(len(temps), np.radians(self.phase))
+        centre = np.zeros((len(temps), 2)) if self.parent is None else self.parent.positions(temps)
+        return centre + self._dans_le_plan(self._anomalie_excentrique(anomalie_moyenne))
+
+    def position(self, t: float) -> np.ndarray:
+        """
+        Position au temps t. Même calcul que positions, mais sur de simples nombres avec le module math :
+        physique.py l'appelle des centaines de milliers de fois, et numpy est lent sur un seul nombre
+        (environ 200 µs par appel avec des tableaux, quelques µs avec math).
+        """
+        t = self._temps(t)
+        e, a = self.excentricite, self.distance
+        M = math.radians(self.phase) + (2 * math.pi * t / self.periode if self.periode > 0 else 0.0)
+        E = M if e < 0.8 else math.pi
+        for _ in range(self.ITERATIONS_KEPLER):
+            E -= (E - e * math.sin(E) - M) / (1 - e * math.cos(E))
+        x = a * (math.cos(E) - e)
+        y = a * math.sqrt(1 - e * e) * math.sin(E)
+        w = math.radians(self.perihelie)
+        point = np.array([x * math.cos(w) - y * math.sin(w), x * math.sin(w) + y * math.cos(w)])
+        return point if self.parent is None else self.parent.position(t) + point
+
+    def distance_max(self) -> float:
+        L'aphélie, le point le plus loin du foyer : a·(1 + e).
+        return self.distance * (1 + self.excentricite)
+
+    def points_orbite(self, t: float, nb_points: int = 120) -> np.ndarray:
+        Points de l'ellipse complète, pour la dessiner.
+        centre = np.zeros(2) if self.parent is None else self.parent.position(t)
+        return centre + self._dans_le_plan(np.linspace(0, 2 * np.pi, nb_points))
+                
