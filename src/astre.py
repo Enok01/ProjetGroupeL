@@ -231,19 +231,17 @@ class AstreElliptique(AstreFixe):
 
     def __init__(self, nom: str, masse: float, couleur: str, taille: float, rayon: float, actif: bool = True, distance: float = 0.0,
                  periode: float = 0.0, phase: float = 0.0, parent = None, excentricite: float = 0.0, perihelie: float = 0.0):
-                 
-                 super().__init__(nom, masse, couleur, taille, rayon, actif, distance, periode, phase, parent)
-                 
-                 try:
-                    self.excentricite = float(excentricite)
-                    self.perihelie = float(perihelie)
-                except (TypeError, ValueError):
-                    raise ValueError(f"AstreElliptique « {nom} » : excentricité et périhélie doivent être des nombres") from None
+        super().__init__(nom, masse, couleur, taille, rayon, actif, distance, periode, phase, parent)
+        try:
+            self.excentricite = float(excentricite)
+            self.perihelie = float(perihelie)
+        except (TypeError, ValueError):
+            raise ValueError(f"AstreElliptique « {nom} » : excentricité et périhélie doivent être des nombres") from None
 
-                    # not (0 <= e < 1) refuse NaN, car toute comparaison avec NaN est fausse
-                    if not 0 <= self.excentricite < 1:
-                        raise ValueError(f"AstreElliptique {nom} : l'excentricité doit être entre 0 (inclus) et 1 (exclu), "
-                        f"recu {self.excentricite}")
+        # not (0 <= e < 1) refuse NaN, car toute comparaison avec NaN est fausse
+        if not 0 <= self.excentricite < 1:
+            raise ValueError(f"AstreElliptique « {nom} » : l'excentricité doit être entre 0 (inclus) et 1 (exclu), "
+                             f"reçu {self.excentricite}")
 
     def _anomalie_excentrique(self, _anomalie_moyenne: np.ndarray) -> np.ndarray:
         """
