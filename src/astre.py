@@ -6,11 +6,10 @@ Documentation officielle :
     classes abstraites (abc) : https://docs.python.org/3/library/abc.html
     pandas Series.get (lecture d'une ligne du CSV) : https://pandas.pydata.org/docs/reference/api/pandas.Series.get.html
 """
+import math
 from abc import ABC, abstractmethod
-from xml.dom import NoModificationAllowedErr
 
 import numpy as np
-import math
 
 #Constante gravitationnelle convertie dans les unités du programme : UA³ / (masse terrestre · jour²) ≈ 8,888e-10
 G_SI = 6.67430e-11          # m³ / (kg · s²)
@@ -270,7 +269,7 @@ class AstreElliptique(AstreFixe):
         :return: Tableau numpy de forme (n, 2)
 
         """
-        a, e = self.distance, sefl.excentricite
+        a, e = self.distance, self.excentricite
         x = a * (np.cos(E) - e)  # On decale le foyer par rapport au centre de l'ellipse
         y = a * np.sqrt(1 - e * e) * np.sin(E)   # b = a·√(1 - e²) : le demi-petit axe
         w = np.radians(self.perihelie)
@@ -306,11 +305,10 @@ class AstreElliptique(AstreFixe):
         return point if self.parent is None else self.parent.position(t) + point
 
     def distance_max(self) -> float:
-        L'aphélie, le point le plus loin du foyer : a·(1 + e).
+        """L'aphélie, le point le plus loin du foyer : a·(1 + e)."""
         return self.distance * (1 + self.excentricite)
 
     def points_orbite(self, t: float, nb_points: int = 120) -> np.ndarray:
-        Points de l'ellipse complète, pour la dessiner.
+        """Points de l'ellipse complète, pour la dessiner."""
         centre = np.zeros(2) if self.parent is None else self.parent.position(t)
         return centre + self._dans_le_plan(np.linspace(0, 2 * np.pi, nb_points))
-                
