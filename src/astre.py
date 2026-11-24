@@ -243,7 +243,7 @@ class AstreElliptique(AstreFixe):
             raise ValueError(f"AstreElliptique « {nom} » : l'excentricité doit être entre 0 (inclus) et 1 (exclu), "
                              f"reçu {self.excentricite}")
 
-    def _anomalie_excentrique(self, _anomalie_moyenne: np.ndarray) -> np.ndarray:
+    def _anomalie_excentrique(self, anomalie_moyenne: np.ndarray) -> np.ndarray:
         """
         Résout l'équation de Kepler E - e·sin(E) = M par la méthode de Newton.
 
@@ -255,7 +255,8 @@ class AstreElliptique(AstreFixe):
         """
 
         e = self.excentricite
-        # Depart E = M ou E = pi
+        # Départ E = M, ou E = π pour une ellipse très allongée (la méthode converge alors toujours)
+        E = anomalie_moyenne.copy() if e < 0.8 else np.full_like(anomalie_moyenne, np.pi)
         for _ in range(self.ITERATIONS_KEPLER):
             E -= (E - e * np.sin(E) - anomalie_moyenne) / (1 - e * np.cos(E))
         return E
