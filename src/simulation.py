@@ -34,8 +34,8 @@ class Simulation:
             if projectile.actif:
                 projectile.reinitialiser()  # Efface l'ancien historique avant de recalculer
                 try:
-                    projectile.cible = calculer_trajectoire(projectile, self.astres, self.dt,
-                                                            projectile.temps_apparition + projectile.duree_vie)
+                    # duree_vie seule : le calcul commence déjà à temps_apparition
+                    projectile.cible = calculer_trajectoire(projectile, self.astres, self.dt, projectile.duree_vie)
                     if projectile.cible is not None:
                         projectile.etat = "collision"
                 except TempsMaximumAtteinte:
