@@ -98,8 +98,9 @@ class GestionnaireObjets(ctk.CTkScrollableFrame):
 
     COLONNES = ("Actif", "Nom", "Type", "Masse (MT)", "Distance (UA)", "Couleur")
 
-    def __init__(self, master):
+    def __init__(self, master, au_changement=None):
         super().__init__(master, width=480, label_text="Objets")
+        self.au_changement = au_changement  # fonction appelée après chaque case cochée ou décochée
         self.afficher()
 
     def afficher(self, astres=(), projectiles=()):
@@ -122,7 +123,7 @@ class GestionnaireObjets(ctk.CTkScrollableFrame):
             est_astre = objet in astres
 
             # CTkCheckBox (select = cocher) : https://customtkinter.tomschimansky.com/documentation/widgets/checkbox
-            case = ctk.CTkCheckBox(self, text="", width=30, command=self.CommandeCase(objet))
+            case = ctk.CTkCheckBox(self, text="", width=30, command=self.CommandeCase(objet, self.au_changement))
             if objet.actif:
                 case.select()
             case.grid(row=ligne, column=0)
@@ -150,14 +151,15 @@ class GestionnaireObjets(ctk.CTkScrollableFrame):
 
         *"Toute opportunité d'utiliser une classe-usine est une bonne opportunité." - Moi, 2026*
         """
-        def __init__(self, objet: Astre):
+        def __init__(self, objet: Astre, au_changement=None):
             self.objet: Astre = objet
+            self.au_changement = au_changement
 
         def __call__(self):
-            if self.objet.actif:
-                self.objet.actif = False
-            else:
-                self.objet.actif = True
+            self.objet.actif = not self.objet.actif
+            # Sans cet appel, la case change mais ni la trajectoire ni le dessin ne suivent
+            if self.au_changement is not None:
+                self.au_changement()
 
 
 class VueGraphique(ctk.CTkFrame):
