@@ -285,7 +285,10 @@ def sauvegarder(sim, fichier):
             "distance": astre.distance,
             "periode": astre.periode,
             "phase": astre.phase,
-            "parent": astre.parent.nom if astre.parent is not None else None  # None s'il n'y a pas de parents.
+            "parent": astre.parent.nom if astre.parent is not None else None,  # None s'il n'y a pas de parents.
+            # Levy : getattr(objet, nom, défaut) lit l'attribut s'il existe, sinon renvoie 0 (orbite circulaire)
+            "excentricite": getattr(astre, "excentricite", 0.0),
+            "perihelie": getattr(astre, "perihelie", 0.0),
         })
 
     for projectile in sim.projectiles:
@@ -307,7 +310,7 @@ def sauvegarder(sim, fichier):
             "duree_vie": projectile.duree_vie,
         })
 
-    df = pd.DataFrame(lignes, columns=COLONNES_tous)
+    df = pd.DataFrame(lignes, columns=COLONNES_tous + COLONNES_optionnelles)
 
     try:
         df.to_csv(fichier, index=False)
