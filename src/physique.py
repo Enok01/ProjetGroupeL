@@ -41,8 +41,9 @@ def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], d
     Nb_iterations_enregistrement = int(1 / dt)
 
     # détermine la longueur maximale pour arrêter la création de la liste
-    astre_loin = max(liste_astre, key=lambda astre: astre.distance)
-    distance_max = astre_loin.distance + DISTANCE_MAX_AJOUTER
+    # distance_max() : rayon pour un cercle, aphélie a·(1 + e) pour une ellipse (polymorphisme)
+    # default=0 : pas d'erreur si la liste est vide
+    distance_max = max((astre.distance_max() for astre in liste_astre), default=0) + DISTANCE_MAX_AJOUTER
 
     # créer une liste de position que le projectile a faite
     pos = projectile.pos0
