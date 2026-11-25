@@ -73,39 +73,6 @@ class Astre(ABC):
         if self.masse < 0 or self.rayon < 0 or self.taille <= 0:
             raise ValueError(f"Astre « {nom} » : masse et rayon doivent être positifs, taille strictement positive")
 
-    def _tableau_temps(self, temps) -> np.ndarray:
-        # convertit une ligne de temps en tableau numpy
-        try:
-            # ne copie pas si le tableau recu est déjà un array
-            return np.asarray(temps, dtype=float).reshape(-1)
-        except (TypeError, ValueError):
-            #from None permet d'afficher la nouvelle erreur et supprimer l'ancienne erreur
-            raise ValueError (f"AstreFixe {self.nom} : les temps doivent etre des nombres de jours") from None
-
-    def positions(self, temps) -> np.ndarray:
-        """retourne les positions (x, y) a plusieurs instants d'un coup sans boucle"""
-        temps = self._tableau_temps(temps)
-        phase = np.radians(self.phase)
-        if self.periode > 0:
-            theta = 2*np.pi*temps / self.periode + phase
-        else:
-            theta = np.full(len(temps), phase) #ce qui signifie que l'astre est immobile: l'angle reste la phase
-        centre = np.zeros((len(temps), 2)) if self.parent is None else self.parent.positions(temps)
-        return centre + self.distance * np.column_stack((np.cos(theta), np.sin(theta)))
-    
-    def distance_max(self) -> float:
-        #retourne la plus grande distance entre l'astre et son centre
-        return self.distance
-
-    def points_orbite(self, t: float, nb_points: int = 120) -> np.ndarray:
-        #retourne les points de l'orbitre pour la dessiner avec ax.plot
-        angles = np.linspace(0, 2 * np.pi, nb_points)
-        centre = np.zeros(2) if self.parent is None else self.parent.position(t)
-        return centre + self.distance * np.column_stack((np.cos(angles), np.sin(angles)))
-
-
-
-
     @abstractmethod
     def position(self, t: float) -> np.ndarray:
         #Renvoie la position (x, y) en UA au temps t (jours), tableau numpy de forme (2,).
@@ -174,6 +141,36 @@ class AstreFixe(Astre):
         if self.periode > 0:
             return 2 * np.pi * t / self.periode + phase
         return phase
+
+    def _tableau_temps(self, temps) -> np.ndarray:
+        # convertit une ligne de temps en tableau numpy
+        try:
+            # ne copie pas si le tableau recu est déjà un array
+            return np.asarray(temps, dtype=float).reshape(-1)
+        except (TypeError, ValueError):
+            #from None permet d'afficher la nouvelle erreur et supprimer l'ancienne erreur
+            raise ValueError (f"AstreFixe {self.nom} : les temps doivent etre des nombres de jours") from None
+
+    def positions(self, temps) -> np.ndarray:
+        """retourne les positions (x, y) a plusieurs instants d'un coup sans boucle"""
+        temps = self._tableau_temps(temps)
+        phase = np.radians(self.phase)
+        if self.periode > 0:
+            theta = 2*np.pi*temps / self.periode + phase
+        else:
+            theta = np.full(len(temps), phase) #ce qui signifie que l'astre est immobile: l'angle reste la phase
+        centre = np.zeros((len(temps), 2)) if self.parent is None else self.parent.positions(temps)
+        return centre + self.distance * np.column_stack((np.cos(theta), np.sin(theta)))
+    
+    def distance_max(self) -> float:
+        #retourne la plus grande distance entre l'astre et son centre
+        return self.distance
+
+    def points_orbite(self, t: float, nb_points: int = 120) -> np.ndarray:
+        #retourne les points de l'orbitre pour la dessiner avec ax.plot
+        angles = np.linspace(0, 2 * np.pi, nb_points)
+        centre = np.zeros(2) if self.parent is None else self.parent.position(t)
+        return centre + self.distance * np.column_stack((np.cos(angles), np.sin(angles)))
 
     def position(self, t: float) -> np.ndarray:
         #Position r(t) = centre + d * (cos(theta), sin(theta)), le centre étant (0, 0) ou le parent.
