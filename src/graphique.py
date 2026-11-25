@@ -452,7 +452,7 @@ class FenetreSimulateur(ctk.CTk):
         self.simulateur = Simulation()
         self.barre_haut = BarreHaut(self, ouvrir=self.ouvrir_csv, enregistrer=self.enregistrer_csv,
                                     lancer=lambda: FormulaireProjectile(self, self.lancer_projectile))
-        self.gestionnaire = GestionnaireObjets(self)
+        self.gestionnaire = GestionnaireObjets(self, au_changement=self.objets_modifies)
         self.vue = VueGraphique(self)
         self.details = DetailsProjectile(self, exporter=self.exporter_trajectoire)
         self.barre_controle = BarreControle(self)
@@ -506,6 +506,11 @@ class FenetreSimulateur(ctk.CTk):
             self.cache["projectiles"] = projectiles
             self.cache["nom_fichier"] = nom_fichier
             self.cache["t"] = t
+
+    def objets_modifies(self):
+        """Une case « actif » a changé : l'attraction n'est plus la même, on recalcule puis on redessine."""
+        self.simulateur.recalculer()
+        self.barre_controle.t = self.barre_controle.t  # passer par le setter redessine au temps actuel
 
     def charger(self, chemin: str):
         """
