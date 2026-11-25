@@ -223,10 +223,9 @@ class VueGraphique(ctk.CTkFrame):
                 x, y = objet.position(t)
 
                 if objet.distance > 0:
-                    # Circle + add_patch : cercle de l'orbite autour du Soleil ou du parent
-                    # https://matplotlib.org/stable/api/_as_gen/matplotlib.patches.Circle.html
-                    centre = objet.parent.position(t) if objet.parent else (0, 0)
-                    ax.add_patch(plt.Circle(centre, objet.distance, fill=False, color=objet.couleur, alpha=0.4))
+                    # points_orbite : un cercle pour AstreFixe, une ellipse pour AstreElliptique (polymorphisme)
+                    orbite = objet.points_orbite(t)
+                    ax.plot(orbite[:, 0], orbite[:, 1], color=objet.couleur, alpha=0.4, linewidth=0.8)
 
                 # np.sqrt : racine carrée, pour que le Soleil (taille 109) ne cache pas tout
                 taille = max(8, 20 * np.sqrt(objet.taille)) if objet in astres else 25
