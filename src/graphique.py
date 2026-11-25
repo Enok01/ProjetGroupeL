@@ -17,7 +17,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-from src.astre import Astre, AstreFixe
+from src.astre import Astre, AstreFixe, AstreElliptique
 from src.chargeur_csv import couleur_aleatoire, sauvegarder, os
 from src.projectile import Projectile
 from src.simulation import Simulation
@@ -130,7 +130,13 @@ class GestionnaireObjets(ctk.CTkScrollableFrame):
             # np.linalg.norm : longueur du vecteur (x, y), donc distance au centre
             # https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html
             distance = objet.distance if est_astre else np.linalg.norm(objet.pos0)
-            valeurs = (objet.nom, "astre" if est_astre else "projectile", f"{objet.masse:.3g}", f"{distance:.2f}")
+            if not est_astre:
+                genre = "projectile"
+            elif isinstance(objet, AstreElliptique):
+                genre = f"ellipse e={objet.excentricite:.3f}"
+            else:
+                genre = "astre"
+            valeurs = (objet.nom, genre, f"{objet.masse:.3g}", f"{distance:.2f}")
             for colonne, valeur in enumerate(valeurs, start=1):
                 texte(self, valeur).grid(row=ligne, column=colonne, padx=6, sticky="w")
             # Pastille de couleur : une étiquette vide dont fg_color est la couleur de fond
