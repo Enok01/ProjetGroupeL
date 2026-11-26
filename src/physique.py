@@ -103,6 +103,31 @@ def acceleration( pos: list[float], astres_positions: list[tuple[AstreFixe, tupl
     return (G * masses / distances2 ** 1.5) @ vecteurs_astre_projectile
 
 
+def accelerations_historique(projectile: Projectile, liste_astre: list[AstreFixe]) -> np.ndarray:
+    """_Accélération (en UA/j²) subie par le projectile à chaque jour de son historique, pour les graphiques._
+
+    Même formule que acceleration(), mais pour tous les jours d'un coup : astre.positions() donne la position
+    de l'astre à chaque jour, et numpy traite les n jours ensemble (une seule boucle Python sur les astres).
+
+    Args:
+        projectile (Projectile): _projectile dont l'historique est déjà calculé_
+        liste_astre (list[AstreFixe]): _astres du système (les inactifs n'attirent pas)_
+
+    Returns:
+        np.ndarray: _tableau (n, 2) des accélérations ax et ay (en UA/j²)_
+    """
+    temps = projectile.temps_apparition + np.arange(len(projectile.historique))
+    positions = projectile.historique[:, :2]
+    acc = np.zeros_like(positions)
+    for astre in liste_astre:
+        if not astre.actif:
+            continue
+        vecteurs = astre.positions(temps) - positions
+        distances2 = np.maximum((vecteurs ** 2).sum(axis=1), 1e-12)  # évite la division par 0
+        acc += (G * astre.masse / distances2 ** 1.5)[:, None] * vecteurs
+    return acc
+
+
 def prochaine_pos_vit( pos: list[float], astres_positions: list[tuple[AstreFixe, tuple[float, float]]], dt: float, v: list[float] ) -> tuple[tuple]:
     """_Calcule la prochaine vitesse et la prochaine position du projectile en utilisant
     l’algorithme de Verlet pour sa conservation d’énergie à long terme. (Pour plus d’information, consulte la vidéo suivante : https://www.youtube.com/watch?v=ii-N61PeeQU&t=747s)
