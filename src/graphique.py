@@ -293,13 +293,15 @@ class DetailsProjectile(ctk.CTkFrame):
 
     INFOS = ("État", "Cible", "Position (UA)", "Vitesse (UA/j)", "Masse (MT)")
 
-    def __init__(self, master, exporter=None):
+    def __init__(self, master, exporter=None, au_choix=None):
         super().__init__(master)
 
         texte(self, "Projectile", 18, True).grid(row=0, column=0, columnspan=2, padx=12, pady=8, sticky="w")
 
         # CTkComboBox (liste déroulante) : https://customtkinter.tomschimansky.com/documentation/widgets/combobox
-        self.choix = ctk.CTkComboBox(self, values=["Aucun projectile"], state="readonly")
+        # command reçoit le nom choisi ; la fenêtre met alors les valeurs à jour
+        self.choix = ctk.CTkComboBox(self, values=["Aucun projectile"], state="readonly",
+                                     command=lambda _nom: au_choix() if au_choix else None)
         self.choix.grid(row=1, column=0, columnspan=2, padx=12, sticky="ew")
         self.valeurs = {}  # libellé -> étiquette où écrire la valeur
         for ligne, nom in enumerate(self.INFOS, start=2):
@@ -311,10 +313,15 @@ class DetailsProjectile(ctk.CTkFrame):
                ).grid(row=len(self.INFOS) + 2, column=0, columnspan=2, padx=12, pady=12)
 
     def afficher(self, noms=(), infos=None):
-        # Remplit la liste des projectiles et les valeurs (« — » si une valeur manque).
+        """Remplit la liste des projectiles ; garde le projectile choisi s'il existe encore."""
         noms = list(noms) or ["Aucun projectile"]
+        choisi = self.choix.get()
         self.choix.configure(values=noms)
-        self.choix.set(noms[0])  # set choisit l'élément affiché
+        self.choix.set(choisi if choisi in noms else noms[0])  # set choisit l'élément affiché
+        self.remplir(infos)
+
+    def remplir(self, infos=None):
+        """Écrit les valeurs (« — » si une valeur manque)."""
         for nom, etiquette in self.valeurs.items():
             etiquette.configure(text=str((infos or {}).get(nom, "—")))
 
