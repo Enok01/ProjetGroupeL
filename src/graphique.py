@@ -304,7 +304,7 @@ class DetailsProjectile(ctk.CTkFrame):
 
     INFOS = ("État", "Cible", "Position (UA)", "Vitesse (UA/j)", "Masse (MT)")
 
-    def __init__(self, master, exporter=None, au_choix=None):
+    def __init__(self, master, exporter=None, au_choix=None, graphiques=None):
         super().__init__(master)
 
         texte(self, "Projectile", 18, True).grid(row=0, column=0, columnspan=2, padx=12, pady=8, sticky="w")
@@ -321,7 +321,9 @@ class DetailsProjectile(ctk.CTkFrame):
             self.valeurs[nom].grid(row=ligne, column=1, padx=12, sticky="w")
 
         bouton(self, "Exporter la trajectoire…", exporter
-               ).grid(row=len(self.INFOS) + 2, column=0, columnspan=2, padx=12, pady=12)
+               ).grid(row=len(self.INFOS) + 2, column=0, columnspan=2, padx=12, pady=(12, 4))
+        bouton(self, "Graphiques position et accélération…", graphiques
+               ).grid(row=len(self.INFOS) + 3, column=0, columnspan=2, padx=12, pady=4)
 
     def afficher(self, noms=(), infos=None):
         """Remplit la liste des projectiles ; garde le projectile choisi s'il existe encore."""
@@ -545,7 +547,8 @@ class FenetreSimulateur(ctk.CTk):
         self.gestionnaire = GestionnaireObjets(self, au_changement=self.objets_modifies)
         self.vue = VueGraphique(self)
         self.details = DetailsProjectile(self, exporter=self.exporter_trajectoire,
-                                         au_choix=lambda: self.actualiser_details(self.barre_controle.t))
+                                         au_choix=lambda: self.actualiser_details(self.barre_controle.t),
+                                         graphiques=self.afficher_graphiques)
         self.barre_controle = BarreControle(self)
 
         # sticky="nsew" : le panneau s'étire dans sa case ; columnspan=3 : la barre prend les 3 colonnes
@@ -682,6 +685,17 @@ class FenetreSimulateur(ctk.CTk):
         self.simulateur.recalculer()
         self.afficher(*self.simulateur.astres_et_projectiles, self.cache["nom_fichier"], self.barre_controle.t)
         return None
+
+    def afficher_graphiques(self):
+        """Ouvre les graphiques de position et d'accélération du projectile choisi."""
+        projectile = self.projectile_choisi()
+        if projectile is None:
+            messagebox.showinfo("Graphiques", "Choisissez d'abord un projectile.", parent=self)
+            return
+        try:
+            FenetreGraphiques(self, projectile, self.simulateur.astres, self.barre_controle.t)
+        except ValueError as erreur:  # trajectoire pas encore calculée
+            messagebox.showinfo("Graphiques", str(erreur), parent=self)
 
     def exporter_trajectoire(self):
         """Écrit la trajectoire du projectile choisi dans un CSV : une ligne par jour (t, x, y, vx, vy)."""
