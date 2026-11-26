@@ -369,6 +369,7 @@ class BarreControle(ctk.CTkFrame):
         self.__t = max(0, min(value, int(self.master.simulateur.temps_max())))  # Garder t entre 0 et temps_max
         self.afficher_temps(self.__t)
         self.master.vue.dessiner(*self.master.simulateur.astres_et_projectiles, self.t)
+        self.master.actualiser_details(self.__t)  # les valeurs du panneau Projectile suivent le temps
 
     # Commandes des boutons
     def __commande_reinitialiser(self):
@@ -480,7 +481,8 @@ class FenetreSimulateur(ctk.CTk):
                                     lancer=lambda: FormulaireProjectile(self, self.lancer_projectile))
         self.gestionnaire = GestionnaireObjets(self, au_changement=self.objets_modifies)
         self.vue = VueGraphique(self)
-        self.details = DetailsProjectile(self, exporter=self.exporter_trajectoire)
+        self.details = DetailsProjectile(self, exporter=self.exporter_trajectoire,
+                                         au_choix=lambda: self.actualiser_details(self.barre_controle.t))
         self.barre_controle = BarreControle(self)
 
         # sticky="nsew" : le panneau s'étire dans sa case ; columnspan=3 : la barre prend les 3 colonnes
@@ -523,8 +525,8 @@ class FenetreSimulateur(ctk.CTk):
             self.barre_haut.afficher_fichier(nom_fichier, len(astres), len(projectiles))
             self.gestionnaire.afficher(astres, projectiles)
             self.vue.dessiner(astres, projectiles, t)
-            infos = {"État": projectiles[0].etat, "Masse (MT)": f"{projectiles[0].masse:g}"} if projectiles else None
-            self.details.afficher([projectile.nom for projectile in projectiles], infos)
+            self.details.afficher([projectile.nom for projectile in projectiles])
+            self.actualiser_details(t)
             self.barre_controle.afficher_temps(t)
 
             # Cache
@@ -532,6 +534,26 @@ class FenetreSimulateur(ctk.CTk):
             self.cache["projectiles"] = projectiles
             self.cache["nom_fichier"] = nom_fichier
             self.cache["t"] = t
+
+    def projectile_choisi(self):
+        """Le projectile choisi dans le panneau de droite, ou None."""
+        nom = self.details.choix.get()
+        return next((p for p in self.simulateur.projectiles if p.nom == nom), None)
+
+    def actualiser_details(self, t):
+        """Met à jour le panneau de droite (position, vitesse et cible) pour le projectile choisi au temps t."""
+        projectile = self.projectile_choisi()
+        if projectile is None:
+            self.details.remplir(None)
+            return
+        x, y, vx, vy, statut = position_affichee(projectile, t)
+        self.details.remplir({
+            "État": projectile.etat if statut != "avant" else "pas encore lancé",
+            "Cible": projectile.cible.nom if projectile.cible is not None else "—",
+            "Position (UA)": f"({x:.3f} ; {y:.3f})",
+            "Vitesse (UA/j)": f"({vx:.4f} ; {vy:.4f})",
+            "Masse (MT)": f"{projectile.masse:g}",
+        })
 
     def objets_modifies(self):
         """Une case « actif » a changé : l'attraction n'est plus la même, on recalcule puis on redessine."""
