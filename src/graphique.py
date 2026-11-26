@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.lines import Line2D
 
 from src.astre import Astre, AstreFixe, AstreElliptique
 from src.chargeur_csv import couleur_aleatoire, sauvegarder, os
@@ -282,6 +283,15 @@ class VueGraphique(ctk.CTkFrame):
                             raise ValueError("État du projectile invalide!")
                     ax.scatter(x, y, taille, objet.couleur, zorder=3, marker="x")
                     ax.annotate(objet.nom, (x, y), xytext=(4, 2), textcoords="offset points", color="white", fontsize=7)
+
+        # Légende : un rond de la couleur de chaque astre affiché, avec son nom
+        # Line2D sans ligne (linestyle="") sert de modèle de symbole : https://matplotlib.org/stable/users/explain/axes/legend_guide.html
+        symboles = [Line2D([], [], marker="o", linestyle="", color=objet.couleur, label=objet.nom)
+                    for objet in actifs if objet in astres]
+        if symboles:
+            ax.legend(handles=symboles, loc="upper right", fontsize=7, facecolor=FOND, edgecolor="gray",
+                      framealpha=0.6, labelcolor="white", title="Astres", title_fontsize=7)
+            ax.get_legend().get_title().set_color("white")
 
         self.canvas.draw_idle()  # redessine la figure dans la fenêtre dès que possible
 
