@@ -26,6 +26,25 @@ from src.exceptions import DebutHistorique, FinHistorique
 FOND = "#0f1424"   # bleu nuit derrière les astres
 
 
+def position_affichee(projectile, t):
+    """
+    Position et vitesse d'un projectile à afficher au temps t, sans jamais lever d'exception.
+
+    :return: (x, y, vx, vy, statut) ; statut vaut "avant" (pas encore lancé), "pendant" ou "apres" (trajectoire terminée)
+    """
+    try:
+        x, y, vx, vy = projectile.etat_a(t)
+        return x, y, vx, vy, "pendant"
+    except DebutHistorique:
+        x, y, vx, vy = projectile.historique[0]
+        return x, y, vx, vy, "avant"
+    except FinHistorique:
+        x, y, vx, vy = projectile.historique[-1]
+        if projectile.etat == "collision" and projectile.cible is not None:
+            x, y = projectile.cible.position(t)  # le projectile reste posé sur l'astre touché
+        return x, y, vx, vy, "apres"
+
+
 def texte(master, contenu: str, taille: int = 13, gras: bool = False) -> ctk.CTkLabel:
     """
     Crée une étiquette de texte.
