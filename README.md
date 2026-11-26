@@ -17,6 +17,13 @@ python -m src.main
 
 > Le programme se lance depuis la racine du dépôt : tous les imports passent par `src.` (ex. `from src.astre import AstreFixe`).
 
+## Nouveautés
+
+- **Orbites elliptiques** (lois de Kepler) : la classe `AstreElliptique` place le Soleil à un foyer de l'ellipse. Le fichier `donnees/systeme_solaire_elliptique.csv` utilise les éléments képlériens de la NASA (JPL, « Approximate Positions of the Planets » : https://ssd.jpl.nasa.gov/planets/approx_pos.html). Deux colonnes facultatives s'ajoutent au CSV : `excentricite` (0 = cercle) et `perihelie` (degrés) ; un ancien fichier sans elles reste valide.
+- **Légende** des couleurs de chaque astre dans la vue.
+- **Graphiques** de la position (x, y, distance au centre) et de l'accélération du projectile en fonction du temps.
+- **Corrections** : le panneau Projectile affiche la position, la vitesse et la cible au temps t ; cocher ou décocher un objet recalcule aussitôt la trajectoire ; un projectile lancé au jour T ne vit plus T jours de trop.
+
 ## Organisation du code
 
 Chaque fichier a un responsable ; pour modifier le fichier d'un autre membre, on le lui demande ou on passe par une pull request qu'il relit.
