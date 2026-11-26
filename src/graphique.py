@@ -18,7 +18,8 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.lines import Line2D
 
-from src.astre import Astre, AstreFixe, AstreElliptique
+from src.astre import Astre, AstreFixe, AstreElliptique, UA_EN_M, JOUR_EN_S
+from src.physique import accelerations_historique
 from src.chargeur_csv import couleur_aleatoire, sauvegarder, os
 from src.projectile import Projectile
 from src.simulation import Simulation
@@ -472,6 +473,58 @@ class FormulaireProjectile(ctk.CTkToplevel):
             self.erreur.configure(text=erreur)
         else:
             self.destroy()
+
+
+class FenetreGraphiques(ctk.CTkToplevel):
+    """
+    Graphiques d'un projectile au fil du temps : sa position (x, y et distance au centre) et son accélération.
+    """
+
+    # 1 UA/jour² en m/s² : UA en mètres divisé par un jour en secondes au carré (≈ 20 m/s²)
+    UA_PAR_JOUR2_EN_M_S2 = UA_EN_M / JOUR_EN_S ** 2
+
+    def __init__(self, master, projectile, astres, t=None):
+        """
+        :param t: Temps actuel, marqué par une ligne verticale (None = pas de ligne)
+        :raises ValueError: Si la trajectoire contient moins de deux jours
+        """
+        # Vérification AVANT de créer la fenêtre, pour ne pas laisser une fenêtre vide ouverte
+        if len(projectile.historique) < 2:
+            raise ValueError(f"La trajectoire de « {projectile.nom} » n'est pas encore calculée.")
+        temps = projectile.temps_apparition + np.arange(len(projectile.historique))
+        x, y = projectile.historique[:, 0], projectile.historique[:, 1]
+        acc = accelerations_historique(projectile, astres) * self.UA_PAR_JOUR2_EN_M_S2
+
+        super().__init__(master)
+        self.title(f"Position et accélération de {projectile.nom}")
+        self.geometry("800x640")
+
+        # Deux graphiques l'un sous l'autre qui partagent l'axe du temps (sharex)
+        # https://matplotlib.org/stable/api/_as_gen/matplotlib.figure.Figure.subplots.html
+        figure = plt.Figure(figsize=(7.5, 6))
+        ax_pos, ax_acc = figure.subplots(2, 1, sharex=True)
+        ax_pos.plot(temps, x, label="x")
+        ax_pos.plot(temps, y, label="y")
+        ax_pos.plot(temps, np.hypot(x, y), label="distance au centre", linewidth=2)
+        ax_pos.set(ylabel="position (UA)", title=f"Position de {projectile.nom} en fonction du temps")
+
+        ax_acc.plot(temps, np.hypot(acc[:, 0], acc[:, 1]), color="crimson")
+        # Échelle logarithmique : l'accélération change énormément près d'un astre
+        # https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_yscale.html
+        ax_acc.set_yscale("log")
+        ax_acc.set(xlabel="t (jours)", ylabel="accélération (m/s²)", title="Accélération due à la gravité des astres")
+
+        for ax in (ax_pos, ax_acc):
+            ax.grid(alpha=0.3)
+            if t is not None and temps[0] <= t <= temps[-1]:
+                ax.axvline(t, color="gray", linestyle="--", linewidth=1)  # le temps actuel
+        ax_pos.legend()
+        figure.tight_layout()  # une seule fois : ce graphique n'est pas redessiné
+
+        canvas = FigureCanvasTkAgg(figure, master=self)
+        NavigationToolbar2Tk(canvas, self, pack_toolbar=False).pack(side="bottom", fill="x")
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        canvas.draw()
 
 
 class FenetreSimulateur(ctk.CTk):
