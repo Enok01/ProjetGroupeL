@@ -11,6 +11,8 @@ COLONNES_communes = ["nom", "masse", "couleur", "taille", "rayon", "actif"]
 COLONNES_fixes = ["distance", "periode", "phase", "parent"]
 COLONNES_projectiles = ["x0", "y0", "vx0", "vy0", "temps_apparition", "duree_vie"]
 COLONNES_tous = ["type"]+COLONNES_communes + COLONNES_fixes + COLONNES_projectiles 
+# Levy : colonnes facultatives des orbites elliptiques ; un ancien CSV sans elles reste valide
+COLONNES_optionnelles = ["excentricite", "perihelie"]
 
 def resource_path(relative_path):
     """Fonction compatible PyInstaller."""
@@ -230,6 +232,16 @@ def valider_csv(df):
             if valeurs["periode"] < 0:
                 erreurs.append(f" la valeur de 'periode' pour l'objet {row['nom']} n'est pas valide : {row['periode']}."
                                f"La valeur doit être positive.")
+            # Levy : colonnes facultatives ; une case vide veut dire 0 (orbite circulaire)
+            for col in COLONNES_optionnelles:
+                if col in df.columns and not pd.isna(row[col]) and pd.isna(pd.to_numeric(row[col], errors="coerce")):
+                    erreurs.append(f" la valeur de '{col}' pour l'objet {row['nom']} n'est pas valide : {row[col]}."
+                                   f" La valeur doit être un nombre.")
+            if "excentricite" in df.columns:
+                e = pd.to_numeric(row["excentricite"], errors="coerce")
+                if not pd.isna(e) and not 0 <= e < 1:
+                    erreurs.append(f" la valeur de 'excentricite' pour l'objet {row['nom']} n'est pas valide : {e}."
+                                   f" La valeur doit être entre 0 (inclus) et 1 (exclu).")
         else:
             if valeurs["temps_apparition"] < 0:
                 erreurs.append(f" la valeur de 'temps_apparition' pour l'objet {row['nom']} n'est pas valide :"
@@ -273,7 +285,10 @@ def sauvegarder(sim, fichier):
             "distance": astre.distance,
             "periode": astre.periode,
             "phase": astre.phase,
-            "parent": astre.parent.nom if astre.parent is not None else None  # None s'il n'y a pas de parents.
+            "parent": astre.parent.nom if astre.parent is not None else None,  # None s'il n'y a pas de parents.
+            # Levy : getattr(objet, nom, défaut) lit l'attribut s'il existe, sinon renvoie 0 (orbite circulaire)
+            "excentricite": getattr(astre, "excentricite", 0.0),
+            "perihelie": getattr(astre, "perihelie", 0.0),
         })
 
     for projectile in sim.projectiles:
@@ -295,7 +310,7 @@ def sauvegarder(sim, fichier):
             "duree_vie": projectile.duree_vie,
         })
 
-    df = pd.DataFrame(lignes, columns=COLONNES_tous)
+    df = pd.DataFrame(lignes, columns=COLONNES_tous + COLONNES_optionnelles)
 
     try:
         df.to_csv(fichier, index=False)

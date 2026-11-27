@@ -6,11 +6,10 @@ Documentation officielle :
     classes abstraites (abc) : https://docs.python.org/3/library/abc.html
     pandas Series.get (lecture d'une ligne du CSV) : https://pandas.pydata.org/docs/reference/api/pandas.Series.get.html
 """
+import math
 from abc import ABC, abstractmethod
-from xml.dom import NoModificationAllowedErr
 
 import numpy as np
-import math
 
 #Constante gravitationnelle convertie dans les unités du programme : UA³ / (masse terrestre · jour²) ≈ 8,888e-10
 G_SI = 6.67430e-11          # m³ / (kg · s²)
@@ -73,39 +72,6 @@ class Astre(ABC):
             raise ValueError(f"Astre « {nom} » : masse, taille et rayon doivent être des nombres") from None
         if self.masse < 0 or self.rayon < 0 or self.taille <= 0:
             raise ValueError(f"Astre « {nom} » : masse et rayon doivent être positifs, taille strictement positive")
-
-    def _tableau_temps(self, temps) -> np.ndarray:
-        # convertit une ligne de temps en tableau numpy
-        try:
-            # ne copie pas si le tableau recu est déjà un array
-            return np.asarray(temps, dtype=float).reshape(-1)
-        except (TypeError, ValueError):
-            #from None permet d'afficher la nouvelle erreur et supprimer l'ancienne erreur
-            raise ValueError (f"AstreFixe {self.nom} : les temps doivent etre des nombres de jours") from None
-
-    def positions(self, temps) -> np.ndarray:
-        """retourne les positions (x, y) a plusieurs instants d'un coup sans boucle"""
-        temps = self._tableau_temps(temps)
-        phase = np.radians(self.phase)
-        if self.periode > 0:
-            theta = 2*np.pi*temps / self.periode + phase
-        else:
-            theta = np.full(len(temps), phase) #ce qui signifie que l'astre est immobile: l'angle reste la phase
-        centre = np.zeros((len(temps), 2)) if self.parent is None else self.parent.positions(temps)
-        return centre + self.distance * np.column_stack((np.cos(theta), np.sin(theta)))
-    
-    def distance_max(self) -> float:
-        #retourne la plus grande distance entre l'astre et son centre
-        return self.distance
-
-    def points_orbite(self, t: float, nb_points: int = 120) -> np.ndarray:
-        #retourne les points de l'orbitre pour la dessiner avec ax.plot
-        angles = np.linspace(0, 2 * np.pi, nb_points)
-        centre = np.zeros(2) if self.parent is None else self.parent.position(t)
-        return centre + self.distance * np.column_stack((np.cos(angles), np.sin(angles)))
-
-
-
 
     @abstractmethod
     def position(self, t: float) -> np.ndarray:
@@ -176,6 +142,36 @@ class AstreFixe(Astre):
             return 2 * np.pi * t / self.periode + phase
         return phase
 
+    def _tableau_temps(self, temps) -> np.ndarray:
+        # convertit une ligne de temps en tableau numpy
+        try:
+            # ne copie pas si le tableau recu est déjà un array
+            return np.asarray(temps, dtype=float).reshape(-1)
+        except (TypeError, ValueError):
+            #from None permet d'afficher la nouvelle erreur et supprimer l'ancienne erreur
+            raise ValueError (f"AstreFixe {self.nom} : les temps doivent etre des nombres de jours") from None
+
+    def positions(self, temps) -> np.ndarray:
+        """retourne les positions (x, y) a plusieurs instants d'un coup sans boucle"""
+        temps = self._tableau_temps(temps)
+        phase = np.radians(self.phase)
+        if self.periode > 0:
+            theta = 2*np.pi*temps / self.periode + phase
+        else:
+            theta = np.full(len(temps), phase) #ce qui signifie que l'astre est immobile: l'angle reste la phase
+        centre = np.zeros((len(temps), 2)) if self.parent is None else self.parent.positions(temps)
+        return centre + self.distance * np.column_stack((np.cos(theta), np.sin(theta)))
+    
+    def distance_max(self) -> float:
+        #retourne la plus grande distance entre l'astre et son centre
+        return self.distance
+
+    def points_orbite(self, t: float, nb_points: int = 120) -> np.ndarray:
+        #retourne les points de l'orbitre pour la dessiner avec ax.plot
+        angles = np.linspace(0, 2 * np.pi, nb_points)
+        centre = np.zeros(2) if self.parent is None else self.parent.position(t)
+        return centre + self.distance * np.column_stack((np.cos(angles), np.sin(angles)))
+
     def position(self, t: float) -> np.ndarray:
         #Position r(t) = centre + d * (cos(theta), sin(theta)), le centre étant (0, 0) ou le parent.
         theta = self._angle(t)
@@ -231,21 +227,19 @@ class AstreElliptique(AstreFixe):
 
     def __init__(self, nom: str, masse: float, couleur: str, taille: float, rayon: float, actif: bool = True, distance: float = 0.0,
                  periode: float = 0.0, phase: float = 0.0, parent = None, excentricite: float = 0.0, perihelie: float = 0.0):
-                 
-                 super().__init__(nom, masse, couleur, taille, rayon, actif, distance, periode, phase, parent)
-                 
-                 try:
-                    self.excentricite = float(excentricite)
-                    self.perihelie = float(perihelie)
-                except (TypeError, ValueError):
-                    raise ValueError(f"AstreElliptique « {nom} » : excentricité et périhélie doivent être des nombres") from None
+        super().__init__(nom, masse, couleur, taille, rayon, actif, distance, periode, phase, parent)
+        try:
+            self.excentricite = float(excentricite)
+            self.perihelie = float(perihelie)
+        except (TypeError, ValueError):
+            raise ValueError(f"AstreElliptique « {nom} » : excentricité et périhélie doivent être des nombres") from None
 
-                    # not (0 <= e < 1) refuse NaN, car toute comparaison avec NaN est fausse
-                    if not 0 <= self.excentricite < 1:
-                        raise ValueError(f"AstreElliptique {nom} : l'excentricité doit être entre 0 (inclus) et 1 (exclu), "
-                        f"recu {self.excentricite}")
+        # not (0 <= e < 1) refuse NaN, car toute comparaison avec NaN est fausse
+        if not 0 <= self.excentricite < 1:
+            raise ValueError(f"AstreElliptique « {nom} » : l'excentricité doit être entre 0 (inclus) et 1 (exclu), "
+                             f"reçu {self.excentricite}")
 
-    def _anomalie_excentrique(self, _anomalie_moyenne: np.ndarray) -> np.ndarray:
+    def _anomalie_excentrique(self, anomalie_moyenne: np.ndarray) -> np.ndarray:
         """
         Résout l'équation de Kepler E - e·sin(E) = M par la méthode de Newton.
 
@@ -257,7 +251,8 @@ class AstreElliptique(AstreFixe):
         """
 
         e = self.excentricite
-        # Depart E = M ou E = pi
+        # Départ E = M, ou E = π pour une ellipse très allongée (la méthode converge alors toujours)
+        E = anomalie_moyenne.copy() if e < 0.8 else np.full_like(anomalie_moyenne, np.pi)
         for _ in range(self.ITERATIONS_KEPLER):
             E -= (E - e * np.sin(E) - anomalie_moyenne) / (1 - e * np.cos(E))
         return E
@@ -271,7 +266,7 @@ class AstreElliptique(AstreFixe):
         :return: Tableau numpy de forme (n, 2)
 
         """
-        a, e = self.distance, sefl.excentricite
+        a, e = self.distance, self.excentricite
         x = a * (np.cos(E) - e)  # On decale le foyer par rapport au centre de l'ellipse
         y = a * np.sqrt(1 - e * e) * np.sin(E)   # b = a·√(1 - e²) : le demi-petit axe
         w = np.radians(self.perihelie)
@@ -307,11 +302,10 @@ class AstreElliptique(AstreFixe):
         return point if self.parent is None else self.parent.position(t) + point
 
     def distance_max(self) -> float:
-        L'aphélie, le point le plus loin du foyer : a·(1 + e).
+        """L'aphélie, le point le plus loin du foyer : a·(1 + e)."""
         return self.distance * (1 + self.excentricite)
 
     def points_orbite(self, t: float, nb_points: int = 120) -> np.ndarray:
-        Points de l'ellipse complète, pour la dessiner.
+        """Points de l'ellipse complète, pour la dessiner."""
         centre = np.zeros(2) if self.parent is None else self.parent.position(t)
         return centre + self._dans_le_plan(np.linspace(0, 2 * np.pi, nb_points))
-                

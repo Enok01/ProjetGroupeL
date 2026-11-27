@@ -41,8 +41,9 @@ def calculer_trajectoire(projectile: Projectile, liste_astre: list[AstreFixe], d
     Nb_iterations_enregistrement = int(1 / dt)
 
     # détermine la longueur maximale pour arrêter la création de la liste
-    astre_loin = max(liste_astre, key=lambda astre: astre.distance)
-    distance_max = astre_loin.distance + DISTANCE_MAX_AJOUTER
+    # distance_max() : rayon pour un cercle, aphélie a·(1 + e) pour une ellipse (polymorphisme)
+    # default=0 : pas d'erreur si la liste est vide
+    distance_max = max((astre.distance_max() for astre in liste_astre), default=0) + DISTANCE_MAX_AJOUTER
 
     # créer une liste de position que le projectile a faite
     pos = projectile.pos0
@@ -100,6 +101,31 @@ def acceleration( pos: list[float], astres_positions: list[tuple[AstreFixe, tupl
     # Fg = Gm1m2/d**2 et a = F/m1, donc a = G * m2/d**2 dans la direction vecteur / d, soit G * m2 * vecteur / d**3.
     # @ (produit matriciel) additionne les contributions de tous les astres : https://numpy.org/doc/stable/reference/generated/numpy.matmul.html
     return (G * masses / distances2 ** 1.5) @ vecteurs_astre_projectile
+
+
+def accelerations_historique(projectile: Projectile, liste_astre: list[AstreFixe]) -> np.ndarray:
+    """_Accélération (en UA/j²) subie par le projectile à chaque jour de son historique, pour les graphiques._
+
+    Même formule que acceleration(), mais pour tous les jours d'un coup : astre.positions() donne la position
+    de l'astre à chaque jour, et numpy traite les n jours ensemble (une seule boucle Python sur les astres).
+
+    Args:
+        projectile (Projectile): _projectile dont l'historique est déjà calculé_
+        liste_astre (list[AstreFixe]): _astres du système (les inactifs n'attirent pas)_
+
+    Returns:
+        np.ndarray: _tableau (n, 2) des accélérations ax et ay (en UA/j²)_
+    """
+    temps = projectile.temps_apparition + np.arange(len(projectile.historique))
+    positions = projectile.historique[:, :2]
+    acc = np.zeros_like(positions)
+    for astre in liste_astre:
+        if not astre.actif:
+            continue
+        vecteurs = astre.positions(temps) - positions
+        distances2 = np.maximum((vecteurs ** 2).sum(axis=1), 1e-12)  # évite la division par 0
+        acc += (G * astre.masse / distances2 ** 1.5)[:, None] * vecteurs
+    return acc
 
 
 def prochaine_pos_vit( pos: list[float], astres_positions: list[tuple[AstreFixe, tuple[float, float]]], dt: float, v: list[float] ) -> tuple[tuple]:

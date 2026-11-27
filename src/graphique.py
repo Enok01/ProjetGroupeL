@@ -16,14 +16,35 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.lines import Line2D
 
-from src.astre import Astre, AstreFixe
+from src.astre import Astre, AstreFixe, AstreElliptique, UA_EN_M, JOUR_EN_S
+from src.physique import accelerations_historique
 from src.chargeur_csv import couleur_aleatoire, sauvegarder, os
 from src.projectile import Projectile
 from src.simulation import Simulation
 from src.exceptions import DebutHistorique, FinHistorique
 
 FOND = "#0f1424"   # bleu nuit derrière les astres
+
+
+def position_affichee(projectile, t):
+    """
+    Position et vitesse d'un projectile à afficher au temps t, sans jamais lever d'exception.
+
+    :return: (x, y, vx, vy, statut) ; statut vaut "avant" (pas encore lancé), "pendant" ou "apres" (trajectoire terminée)
+    """
+    try:
+        x, y, vx, vy = projectile.etat_a(t)
+        return x, y, vx, vy, "pendant"
+    except DebutHistorique:
+        x, y, vx, vy = projectile.historique[0]
+        return x, y, vx, vy, "avant"
+    except FinHistorique:
+        x, y, vx, vy = projectile.historique[-1]
+        if projectile.etat == "collision" and projectile.cible is not None:
+            x, y = projectile.cible.position(t)  # le projectile reste posé sur l'astre touché
+        return x, y, vx, vy, "apres"
 
 
 def texte(master, contenu: str, taille: int = 13, gras: bool = False) -> ctk.CTkLabel:
@@ -98,8 +119,9 @@ class GestionnaireObjets(ctk.CTkScrollableFrame):
 
     COLONNES = ("Actif", "Nom", "Type", "Masse (MT)", "Distance (UA)", "Couleur")
 
-    def __init__(self, master):
+    def __init__(self, master, au_changement=None):
         super().__init__(master, width=480, label_text="Objets")
+        self.au_changement = au_changement  # fonction appelée après chaque case cochée ou décochée
         self.afficher()
 
     def afficher(self, astres=(), projectiles=()):
@@ -122,7 +144,7 @@ class GestionnaireObjets(ctk.CTkScrollableFrame):
             est_astre = objet in astres
 
             # CTkCheckBox (select = cocher) : https://customtkinter.tomschimansky.com/documentation/widgets/checkbox
-            case = ctk.CTkCheckBox(self, text="", width=30, command=self.CommandeCase(objet))
+            case = ctk.CTkCheckBox(self, text="", width=30, command=self.CommandeCase(objet, self.au_changement))
             if objet.actif:
                 case.select()
             case.grid(row=ligne, column=0)
@@ -130,7 +152,13 @@ class GestionnaireObjets(ctk.CTkScrollableFrame):
             # np.linalg.norm : longueur du vecteur (x, y), donc distance au centre
             # https://numpy.org/doc/stable/reference/generated/numpy.linalg.norm.html
             distance = objet.distance if est_astre else np.linalg.norm(objet.pos0)
-            valeurs = (objet.nom, "astre" if est_astre else "projectile", f"{objet.masse:.3g}", f"{distance:.2f}")
+            if not est_astre:
+                genre = "projectile"
+            elif isinstance(objet, AstreElliptique):
+                genre = f"ellipse e={objet.excentricite:.3f}"
+            else:
+                genre = "astre"
+            valeurs = (objet.nom, genre, f"{objet.masse:.3g}", f"{distance:.2f}")
             for colonne, valeur in enumerate(valeurs, start=1):
                 texte(self, valeur).grid(row=ligne, column=colonne, padx=6, sticky="w")
             # Pastille de couleur : une étiquette vide dont fg_color est la couleur de fond
@@ -144,14 +172,15 @@ class GestionnaireObjets(ctk.CTkScrollableFrame):
 
         *"Toute opportunité d'utiliser une classe-usine est une bonne opportunité." - Moi, 2026*
         """
-        def __init__(self, objet: Astre):
+        def __init__(self, objet: Astre, au_changement=None):
             self.objet: Astre = objet
+            self.au_changement = au_changement
 
         def __call__(self):
-            if self.objet.actif:
-                self.objet.actif = False
-            else:
-                self.objet.actif = True
+            self.objet.actif = not self.objet.actif
+            # Sans cet appel, la case change mais ni la trajectoire ni le dessin ne suivent
+            if self.au_changement is not None:
+                self.au_changement()
 
 
 class VueGraphique(ctk.CTkFrame):
@@ -223,10 +252,9 @@ class VueGraphique(ctk.CTkFrame):
                 x, y = objet.position(t)
 
                 if objet.distance > 0:
-                    # Circle + add_patch : cercle de l'orbite autour du Soleil ou du parent
-                    # https://matplotlib.org/stable/api/_as_gen/matplotlib.patches.Circle.html
-                    centre = objet.parent.position(t) if objet.parent else (0, 0)
-                    ax.add_patch(plt.Circle(centre, objet.distance, fill=False, color=objet.couleur, alpha=0.4))
+                    # points_orbite : un cercle pour AstreFixe, une ellipse pour AstreElliptique (polymorphisme)
+                    orbite = objet.points_orbite(t)
+                    ax.plot(orbite[:, 0], orbite[:, 1], color=objet.couleur, alpha=0.4, linewidth=0.8)
 
                 # np.sqrt : racine carrée, pour que le Soleil (taille 109) ne cache pas tout
                 taille = max(8, 20 * np.sqrt(objet.taille)) if objet in astres else 25
@@ -257,6 +285,15 @@ class VueGraphique(ctk.CTkFrame):
                     ax.scatter(x, y, taille, objet.couleur, zorder=3, marker="x")
                     ax.annotate(objet.nom, (x, y), xytext=(4, 2), textcoords="offset points", color="white", fontsize=7)
 
+        # Légende : un rond de la couleur de chaque astre affiché, avec son nom
+        # Line2D sans ligne (linestyle="") sert de modèle de symbole : https://matplotlib.org/stable/users/explain/axes/legend_guide.html
+        symboles = [Line2D([], [], marker="o", linestyle="", color=objet.couleur, label=objet.nom)
+                    for objet in actifs if objet in astres]
+        if symboles:
+            ax.legend(handles=symboles, loc="upper right", fontsize=7, facecolor=FOND, edgecolor="gray",
+                      framealpha=0.6, labelcolor="white", title="Astres", title_fontsize=7)
+            ax.get_legend().get_title().set_color("white")
+
         self.canvas.draw_idle()  # redessine la figure dans la fenêtre dès que possible
 
 
@@ -267,13 +304,15 @@ class DetailsProjectile(ctk.CTkFrame):
 
     INFOS = ("État", "Cible", "Position (UA)", "Vitesse (UA/j)", "Masse (MT)")
 
-    def __init__(self, master, exporter=None):
+    def __init__(self, master, exporter=None, au_choix=None, graphiques=None):
         super().__init__(master)
 
         texte(self, "Projectile", 18, True).grid(row=0, column=0, columnspan=2, padx=12, pady=8, sticky="w")
 
         # CTkComboBox (liste déroulante) : https://customtkinter.tomschimansky.com/documentation/widgets/combobox
-        self.choix = ctk.CTkComboBox(self, values=["Aucun projectile"], state="readonly")
+        # command reçoit le nom choisi ; la fenêtre met alors les valeurs à jour
+        self.choix = ctk.CTkComboBox(self, values=["Aucun projectile"], state="readonly",
+                                     command=lambda _nom: au_choix() if au_choix else None)
         self.choix.grid(row=1, column=0, columnspan=2, padx=12, sticky="ew")
         self.valeurs = {}  # libellé -> étiquette où écrire la valeur
         for ligne, nom in enumerate(self.INFOS, start=2):
@@ -282,13 +321,20 @@ class DetailsProjectile(ctk.CTkFrame):
             self.valeurs[nom].grid(row=ligne, column=1, padx=12, sticky="w")
 
         bouton(self, "Exporter la trajectoire…", exporter
-               ).grid(row=len(self.INFOS) + 2, column=0, columnspan=2, padx=12, pady=12)
+               ).grid(row=len(self.INFOS) + 2, column=0, columnspan=2, padx=12, pady=(12, 4))
+        bouton(self, "Graphiques position et accélération…", graphiques
+               ).grid(row=len(self.INFOS) + 3, column=0, columnspan=2, padx=12, pady=4)
 
     def afficher(self, noms=(), infos=None):
-        # Remplit la liste des projectiles et les valeurs (« — » si une valeur manque).
+        """Remplit la liste des projectiles ; garde le projectile choisi s'il existe encore."""
         noms = list(noms) or ["Aucun projectile"]
+        choisi = self.choix.get()
         self.choix.configure(values=noms)
-        self.choix.set(noms[0])  # set choisit l'élément affiché
+        self.choix.set(choisi if choisi in noms else noms[0])  # set choisit l'élément affiché
+        self.remplir(infos)
+
+    def remplir(self, infos=None):
+        """Écrit les valeurs (« — » si une valeur manque)."""
         for nom, etiquette in self.valeurs.items():
             etiquette.configure(text=str((infos or {}).get(nom, "—")))
 
@@ -336,6 +382,7 @@ class BarreControle(ctk.CTkFrame):
         self.__t = max(0, min(value, int(self.master.simulateur.temps_max())))  # Garder t entre 0 et temps_max
         self.afficher_temps(self.__t)
         self.master.vue.dessiner(*self.master.simulateur.astres_et_projectiles, self.t)
+        self.master.actualiser_details(self.__t)  # les valeurs du panneau Projectile suivent le temps
 
     # Commandes des boutons
     def __commande_reinitialiser(self):
@@ -430,6 +477,58 @@ class FormulaireProjectile(ctk.CTkToplevel):
             self.destroy()
 
 
+class FenetreGraphiques(ctk.CTkToplevel):
+    """
+    Graphiques d'un projectile au fil du temps : sa position (x, y et distance au centre) et son accélération.
+    """
+
+    # 1 UA/jour² en m/s² : UA en mètres divisé par un jour en secondes au carré (≈ 20 m/s²)
+    UA_PAR_JOUR2_EN_M_S2 = UA_EN_M / JOUR_EN_S ** 2
+
+    def __init__(self, master, projectile, astres, t=None):
+        """
+        :param t: Temps actuel, marqué par une ligne verticale (None = pas de ligne)
+        :raises ValueError: Si la trajectoire contient moins de deux jours
+        """
+        # Vérification AVANT de créer la fenêtre, pour ne pas laisser une fenêtre vide ouverte
+        if len(projectile.historique) < 2:
+            raise ValueError(f"La trajectoire de « {projectile.nom} » n'est pas encore calculée.")
+        temps = projectile.temps_apparition + np.arange(len(projectile.historique))
+        x, y = projectile.historique[:, 0], projectile.historique[:, 1]
+        acc = accelerations_historique(projectile, astres) * self.UA_PAR_JOUR2_EN_M_S2
+
+        super().__init__(master)
+        self.title(f"Position et accélération de {projectile.nom}")
+        self.geometry("800x640")
+
+        # Deux graphiques l'un sous l'autre qui partagent l'axe du temps (sharex)
+        # https://matplotlib.org/stable/api/_as_gen/matplotlib.figure.Figure.subplots.html
+        figure = plt.Figure(figsize=(7.5, 6))
+        ax_pos, ax_acc = figure.subplots(2, 1, sharex=True)
+        ax_pos.plot(temps, x, label="x")
+        ax_pos.plot(temps, y, label="y")
+        ax_pos.plot(temps, np.hypot(x, y), label="distance au centre", linewidth=2)
+        ax_pos.set(ylabel="position (UA)", title=f"Position de {projectile.nom} en fonction du temps")
+
+        ax_acc.plot(temps, np.hypot(acc[:, 0], acc[:, 1]), color="crimson")
+        # Échelle logarithmique : l'accélération change énormément près d'un astre
+        # https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.set_yscale.html
+        ax_acc.set_yscale("log")
+        ax_acc.set(xlabel="t (jours)", ylabel="accélération (m/s²)", title="Accélération due à la gravité des astres")
+
+        for ax in (ax_pos, ax_acc):
+            ax.grid(alpha=0.3)
+            if t is not None and temps[0] <= t <= temps[-1]:
+                ax.axvline(t, color="gray", linestyle="--", linewidth=1)  # le temps actuel
+        ax_pos.legend()
+        figure.tight_layout()  # une seule fois : ce graphique n'est pas redessiné
+
+        canvas = FigureCanvasTkAgg(figure, master=self)
+        NavigationToolbar2Tk(canvas, self, pack_toolbar=False).pack(side="bottom", fill="x")
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+        canvas.draw()
+
+
 class FenetreSimulateur(ctk.CTk):
     """
     Fenêtre complète : barre du haut, objets à gauche, graphique au centre, projectile à droite, contrôles en bas.
@@ -445,9 +544,11 @@ class FenetreSimulateur(ctk.CTk):
         self.simulateur = Simulation()
         self.barre_haut = BarreHaut(self, ouvrir=self.ouvrir_csv, enregistrer=self.enregistrer_csv,
                                     lancer=lambda: FormulaireProjectile(self, self.lancer_projectile))
-        self.gestionnaire = GestionnaireObjets(self)
+        self.gestionnaire = GestionnaireObjets(self, au_changement=self.objets_modifies)
         self.vue = VueGraphique(self)
-        self.details = DetailsProjectile(self, exporter=self.exporter_trajectoire)
+        self.details = DetailsProjectile(self, exporter=self.exporter_trajectoire,
+                                         au_choix=lambda: self.actualiser_details(self.barre_controle.t),
+                                         graphiques=self.afficher_graphiques)
         self.barre_controle = BarreControle(self)
 
         # sticky="nsew" : le panneau s'étire dans sa case ; columnspan=3 : la barre prend les 3 colonnes
@@ -490,8 +591,8 @@ class FenetreSimulateur(ctk.CTk):
             self.barre_haut.afficher_fichier(nom_fichier, len(astres), len(projectiles))
             self.gestionnaire.afficher(astres, projectiles)
             self.vue.dessiner(astres, projectiles, t)
-            infos = {"État": projectiles[0].etat, "Masse (MT)": f"{projectiles[0].masse:g}"} if projectiles else None
-            self.details.afficher([projectile.nom for projectile in projectiles], infos)
+            self.details.afficher([projectile.nom for projectile in projectiles])
+            self.actualiser_details(t)
             self.barre_controle.afficher_temps(t)
 
             # Cache
@@ -499,6 +600,31 @@ class FenetreSimulateur(ctk.CTk):
             self.cache["projectiles"] = projectiles
             self.cache["nom_fichier"] = nom_fichier
             self.cache["t"] = t
+
+    def projectile_choisi(self):
+        """Le projectile choisi dans le panneau de droite, ou None."""
+        nom = self.details.choix.get()
+        return next((p for p in self.simulateur.projectiles if p.nom == nom), None)
+
+    def actualiser_details(self, t):
+        """Met à jour le panneau de droite (position, vitesse et cible) pour le projectile choisi au temps t."""
+        projectile = self.projectile_choisi()
+        if projectile is None:
+            self.details.remplir(None)
+            return
+        x, y, vx, vy, statut = position_affichee(projectile, t)
+        self.details.remplir({
+            "État": projectile.etat if statut != "avant" else "pas encore lancé",
+            "Cible": projectile.cible.nom if projectile.cible is not None else "—",
+            "Position (UA)": f"({x:.3f} ; {y:.3f})",
+            "Vitesse (UA/j)": f"({vx:.4f} ; {vy:.4f})",
+            "Masse (MT)": f"{projectile.masse:g}",
+        })
+
+    def objets_modifies(self):
+        """Une case « actif » a changé : l'attraction n'est plus la même, on recalcule puis on redessine."""
+        self.simulateur.recalculer()
+        self.barre_controle.t = self.barre_controle.t  # passer par le setter redessine au temps actuel
 
     def charger(self, chemin: str):
         """
@@ -559,6 +685,17 @@ class FenetreSimulateur(ctk.CTk):
         self.simulateur.recalculer()
         self.afficher(*self.simulateur.astres_et_projectiles, self.cache["nom_fichier"], self.barre_controle.t)
         return None
+
+    def afficher_graphiques(self):
+        """Ouvre les graphiques de position et d'accélération du projectile choisi."""
+        projectile = self.projectile_choisi()
+        if projectile is None:
+            messagebox.showinfo("Graphiques", "Choisissez d'abord un projectile.", parent=self)
+            return
+        try:
+            FenetreGraphiques(self, projectile, self.simulateur.astres, self.barre_controle.t)
+        except ValueError as erreur:  # trajectoire pas encore calculée
+            messagebox.showinfo("Graphiques", str(erreur), parent=self)
 
     def exporter_trajectoire(self):
         """Écrit la trajectoire du projectile choisi dans un CSV : une ligne par jour (t, x, y, vx, vy)."""

@@ -1,0 +1,11 @@
+nom,type,masse,couleur,taille,rayon,actif,distance,periode,phase,parent,x0,y0,vx0,vy0,temps_apparition,duree_vie,excentricite,perihelie
+Soleil,AstreFixe,332946.0487,orange,109,0.00464913,true,0.0,0.0,0.0,,,,,,,,0,0
+Mercure,AstreFixe,0.0553,gray,0.3829,0.00001630638,true,0.38709927,87.9691,174.79,,,,,,,,0.20563593,77.45779628
+Vénus,AstreFixe,0.815,khaki,0.9499,0.00004045378,true,0.72333566,224.701,50.38,,,,,,,,0.00677672,131.60246718
+Terre,AstreFixe,1,cornflowerblue,1.0,0.00004263521,true,1.00000261,365.256,357.53,,,,,,,,0.01671123,102.93768193
+Mars,AstreFixe,0.107,darkorange,0.533,0.00002270219,true,1.52371034,686.980,19.39,,,,,,,,0.09339410,336.05637041
+Jupiter,AstreFixe,317.8,papayawhip,10.969,0.0004778678,true,5.20288700,4332.59,19.67,,,,,,,,0.04838624,14.72847983
+Saturne,AstreFixe,95.2,antiquewhite,9.1402,0.0003892569,true,9.53667594,10759.22,317.36,,,,,,,,0.05386179,92.59887831
+Uranus,AstreFixe,14.5,skyblue,3.981,0.0001695345,true,19.18916464,30688.5,142.28,,,,,,,,0.04725744,170.95427630
+Neptune,AstreFixe,17.1,lightsteelblue,3.864,0.0001645879,true,30.06992276,60182,259.92,,,,,,,,0.00859048,44.96476227
+Exemple,Projectile,0.001,magenta,0.5,0.000001,true,,,,,1.654,4.2,0.006,0.007,1,9000,,
